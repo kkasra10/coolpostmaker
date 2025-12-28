@@ -188,6 +188,37 @@
             margin-top: 10px;
             border: 1px solid #c3e6cb;
         }
+
+        .formatting-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .format-btn {
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .format-btn:hover {
+            background: #e0e0e0;
+            transform: translateY(-1px);
+        }
+
+        .format-btn:active {
+            transform: translateY(0);
+        }
+
+        #generateBtn.active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
     </style>
 </head>
 <body>
@@ -210,10 +241,19 @@
 
             <div class="form-group">
                 <label for="postText">Post Text:</label>
+                <div class="formatting-toolbar">
+                    <button class="format-btn" onclick="formatText('bold')" title="Bold"><b>B</b></button>
+                    <button class="format-btn" onclick="formatText('italic')" title="Italic"><i>I</i></button>
+                    <button class="format-btn" onclick="formatText('underline')" title="Underline"><u>U</u></button>
+                    <button class="format-btn" onclick="formatText('h1')" title="Heading 1">H1</button>
+                    <button class="format-btn" onclick="formatText('h2')" title="Heading 2">H2</button>
+                    <button class="format-btn" onclick="formatText('link')" title="Link">🔗</button>
+                    <button class="format-btn" onclick="formatText('code')" title="Code">&lt;/&gt;</button>
+                </div>
                 <textarea id="postText" placeholder="Enter your post content here..."></textarea>
             </div>
 
-            <button onclick="generateHTML()">🔄 Generate HTML</button>
+            <button id="generateBtn" onclick="toggleHTMLExport()">🔄 Generate HTML</button>
         </div>
 
         <!-- Preview Panel -->
@@ -241,8 +281,10 @@
         const htmlOutputSection = document.getElementById('htmlOutputSection');
         const htmlOutput = document.getElementById('htmlOutput');
         const copyAlert = document.getElementById('copyAlert');
+        const generateBtn = document.getElementById('generateBtn');
 
         let uploadedImageData = null;
+        let isHTMLVisible = false;
 
         // Toggle image upload visibility
         wantImageCheckbox.addEventListener('change', function() {
@@ -288,10 +330,81 @@
             }
 
             if (text) {
-                previewHTML += `<div class="text-content">${escapeHTML(text)}</div>`;
+                // Render HTML tags in preview
+                previewHTML += `<div class="text-content">${text}</div>`;
             }
 
             preview.innerHTML = previewHTML;
+        }
+
+        function formatText(format) {
+            const textarea = postText;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+
+            if (!selectedText) {
+                alert('Please select some text to format!');
+                return;
+            }
+
+            let formattedText = '';
+
+            switch(format) {
+                case 'bold':
+                    formattedText = `<strong>${selectedText}</strong>`;
+                    break;
+                case 'italic':
+                    formattedText = `<em>${selectedText}</em>`;
+                    break;
+                case 'underline':
+                    formattedText = `<u>${selectedText}</u>`;
+                    break;
+                case 'h1':
+                    formattedText = `<h1>${selectedText}</h1>`;
+                    break;
+                case 'h2':
+                    formattedText = `<h2>${selectedText}</h2>`;
+                    break;
+                case 'link':
+                    const url = prompt('Enter URL:', 'https://');
+                    if (url) {
+                        formattedText = `<a href="${url}" target="_blank">${selectedText}</a>`;
+                    } else {
+                        return;
+                    }
+                    break;
+                case 'code':
+                    formattedText = `<code>${selectedText}</code>`;
+                    break;
+                default:
+                    formattedText = selectedText;
+            }
+
+            // Replace selected text with formatted version
+            const newValue = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+            textarea.value = newValue;
+
+            // Update cursor position
+            const newCursorPos = start + formattedText.length;
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+            textarea.focus();
+
+            // Update preview
+            updatePreview();
+        }
+
+        function toggleHTMLExport() {
+            if (isHTMLVisible) {
+                // Hide HTML output
+                htmlOutputSection.classList.add('hidden');
+                generateBtn.textContent = '🔄 Generate HTML';
+                generateBtn.classList.remove('active');
+                isHTMLVisible = false;
+            } else {
+                // Show HTML output
+                generateHTML();
+            }
         }
 
         function generateHTML() {
@@ -310,7 +423,8 @@
             }
 
             if (text) {
-                generatedHTML += `  <div class="post-text">\n    ${escapeHTML(text)}\n  </div>\n`;
+                // Don't escape HTML since user may have added formatting
+                generatedHTML += `  <div class="post-text">\n    ${text}\n  </div>\n`;
             }
 
             generatedHTML += '</div>';
@@ -347,6 +461,11 @@
 
             htmlOutput.textContent = fullHTML;
             htmlOutputSection.classList.remove('hidden');
+
+            // Update button state
+            generateBtn.textContent = '❌ Hide HTML';
+            generateBtn.classList.add('active');
+            isHTMLVisible = true;
 
             // Scroll to HTML output
             htmlOutputSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
