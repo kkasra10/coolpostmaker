@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cool Post Maker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 25px;
+            font-size: 28px;
+        }
+
+        h2 {
+            color: #764ba2;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            background: #f8f9ff;
+            cursor: pointer;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .preview-post {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 200px;
+            background: #fafafa;
+        }
+
+        .preview-post img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .preview-post .text-content {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .html-output {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .copy-btn {
+            margin-top: 10px;
+            background: #28a745;
+        }
+
+        .copy-btn:hover {
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+
+        .alert {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Form Panel -->
+        <div class="panel">
+            <h1>🎨 Cool Post Maker</h1>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="wantImage">
+                    <span>Do you want to add an image?</span>
+                </label>
+            </div>
+
+            <div class="form-group hidden" id="imageUploadGroup">
+                <label for="imageUpload">Upload Image:</label>
+                <input type="file" id="imageUpload" accept="image/*">
+            </div>
+
+            <div class="form-group">
+                <label for="postText">Post Text:</label>
+                <textarea id="postText" placeholder="Enter your post content here..."></textarea>
+            </div>
+
+            <button onclick="generateHTML()">🔄 Generate HTML</button>
+        </div>
+
+        <!-- Preview Panel -->
+        <div class="panel">
+            <h2>👁️ Live Preview</h2>
+            <div class="preview-post" id="preview">
+                <div class="empty-state">Your post preview will appear here...</div>
+            </div>
+
+            <div id="htmlOutputSection" class="hidden">
+                <h2 style="margin-top: 25px;">📄 HTML Code</h2>
+                <div class="html-output" id="htmlOutput"></div>
+                <button class="copy-btn" onclick="copyHTML()">📋 Copy HTML</button>
+                <div id="copyAlert" class="alert hidden">HTML copied to clipboard!</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const wantImageCheckbox = document.getElementById('wantImage');
+        const imageUploadGroup = document.getElementById('imageUploadGroup');
+        const imageUpload = document.getElementById('imageUpload');
+        const postText = document.getElementById('postText');
+        const preview = document.getElementById('preview');
+        const htmlOutputSection = document.getElementById('htmlOutputSection');
+        const htmlOutput = document.getElementById('htmlOutput');
+        const copyAlert = document.getElementById('copyAlert');
+
+        let uploadedImageData = null;
+
+        // Toggle image upload visibility
+        wantImageCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                imageUploadGroup.classList.remove('hidden');
+            } else {
+                imageUploadGroup.classList.add('hidden');
+                imageUpload.value = '';
+                uploadedImageData = null;
+                updatePreview();
+            }
+        });
+
+        // Handle image upload
+        imageUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedImageData = e.target.result;
+                    updatePreview();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Update preview on text input
+        postText.addEventListener('input', updatePreview);
+
+        function updatePreview() {
+            const text = postText.value;
+            const hasImage = wantImageCheckbox.checked && uploadedImageData;
+
+            if (!text && !hasImage) {
+                preview.innerHTML = '<div class="empty-state">Your post preview will appear here...</div>';
+                return;
+            }
+
+            let previewHTML = '';
+
+            if (hasImage) {
+                previewHTML += `<img src="${uploadedImageData}" alt="Post image">`;
+            }
+
+            if (text) {
+                previewHTML += `<div class="text-content">${escapeHTML(text)}</div>`;
+            }
+
+            preview.innerHTML = previewHTML;
+        }
+
+        function generateHTML() {
+            const text = postText.value;
+            const hasImage = wantImageCheckbox.checked && uploadedImageData;
+
+            if (!text && !hasImage) {
+                alert('Please add some content to your post!');
+                return;
+            }
+
+            let generatedHTML = '<div class="post">\n';
+
+            if (hasImage) {
+                generatedHTML += `  <img src="${uploadedImageData}" alt="Post image" style="max-width: 100%; height: auto; display: block; margin-bottom: 15px;">\n`;
+            }
+
+            if (text) {
+                generatedHTML += `  <div class="post-text">\n    ${escapeHTML(text)}\n  </div>\n`;
+            }
+
+            generatedHTML += '</div>';
+
+            // Add CSS styling suggestion
+            const cssStyles = `
+<style>
+  .post {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+  }
+
+  .post img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin-bottom: 15px;
+    border-radius: 8px;
+  }
+
+  .post-text {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-wrap;
+  }
+</style>
+
+`;
+
+            const fullHTML = cssStyles + generatedHTML;
+
+            htmlOutput.textContent = fullHTML;
+            htmlOutputSection.classList.remove('hidden');
+
+            // Scroll to HTML output
+            htmlOutputSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function copyHTML() {
+            const htmlText = htmlOutput.textContent;
+            navigator.clipboard.writeText(htmlText).then(function() {
+                copyAlert.classList.remove('hidden');
+                setTimeout(function() {
+                    copyAlert.classList.add('hidden');
+                }, 3000);
+            }, function() {
+                alert('Failed to copy HTML. Please copy manually.');
+            });
+        }
+
+        function escapeHTML(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
