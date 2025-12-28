@@ -194,6 +194,7 @@
             gap: 8px;
             margin-bottom: 10px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .format-btn {
@@ -214,6 +215,43 @@
 
         .format-btn:active {
             transform: translateY(0);
+        }
+
+        select, input[type="text"] {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            background: white;
+            transition: all 0.2s;
+        }
+
+        select:hover, input[type="text"]:hover {
+            border-color: #667eea;
+        }
+
+        select:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+
+        .font-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        #fontInput {
+            min-width: 300px;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 30px;
+            background: #ccc;
+            margin: 0 4px;
         }
 
         #generateBtn.active {
@@ -245,10 +283,38 @@
                     <button class="format-btn" onclick="formatText('bold')" title="Bold"><b>B</b></button>
                     <button class="format-btn" onclick="formatText('italic')" title="Italic"><i>I</i></button>
                     <button class="format-btn" onclick="formatText('underline')" title="Underline"><u>U</u></button>
+                    <button class="format-btn" onclick="formatText('strikethrough')" title="Strikethrough"><s>S</s></button>
+                    <div class="toolbar-divider"></div>
                     <button class="format-btn" onclick="formatText('h1')" title="Heading 1">H1</button>
                     <button class="format-btn" onclick="formatText('h2')" title="Heading 2">H2</button>
+                    <button class="format-btn" onclick="formatText('h3')" title="Heading 3">H3</button>
+                    <div class="toolbar-divider"></div>
                     <button class="format-btn" onclick="formatText('link')" title="Link">🔗</button>
                     <button class="format-btn" onclick="formatText('code')" title="Code">&lt;/&gt;</button>
+                    <button class="format-btn" onclick="formatText('highlight')" title="Highlight">🖍️</button>
+                    <button class="format-btn" onclick="formatText('quote')" title="Quote">❝❞</button>
+                    <div class="toolbar-divider"></div>
+                    <div class="font-selector">
+                        <label for="fontSelect" style="margin: 0; font-size: 14px;">Font:</label>
+                        <select id="fontSelect" onchange="handleFontChange()">
+                            <option value="">Default</option>
+                            <option value="Arial, sans-serif">Arial</option>
+                            <option value="'Helvetica Neue', Helvetica, sans-serif">Helvetica</option>
+                            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="'Courier New', Courier, monospace">Courier New</option>
+                            <option value="Verdana, sans-serif">Verdana</option>
+                            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                            <option value="Impact, sans-serif">Impact</option>
+                            <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+                            <option value="'Palatino Linotype', 'Book Antiqua', Palatino, serif">Palatino</option>
+                            <option value="'Lucida Console', Monaco, monospace">Lucida Console</option>
+                            <option value="Tahoma, sans-serif">Tahoma</option>
+                            <option value="other">Other (Google Fonts)</option>
+                        </select>
+                        <input type="text" id="fontInput" class="hidden" placeholder="Paste Google Fonts link here..." onblur="applyCustomFont()">
+                        <a href="https://fonts.google.com/" target="_blank" id="googleFontsLink" class="hidden" style="font-size: 12px; color: #667eea; text-decoration: none;">Browse Fonts →</a>
+                    </div>
                 </div>
                 <textarea id="postText" placeholder="Enter your post content here..."></textarea>
             </div>
@@ -285,6 +351,8 @@
 
         let uploadedImageData = null;
         let isHTMLVisible = false;
+        let customGoogleFontLink = '';
+        let selectedFont = '';
 
         // Toggle image upload visibility
         wantImageCheckbox.addEventListener('change', function() {
@@ -330,11 +398,28 @@
             }
 
             if (text) {
-                // Render HTML tags in preview
-                previewHTML += `<div class="text-content">${text}</div>`;
+                // Render HTML tags in preview with selected font
+                const fontStyle = selectedFont ? `style="font-family: ${selectedFont};"` : '';
+                previewHTML += `<div class="text-content" ${fontStyle}>${text}</div>`;
             }
 
             preview.innerHTML = previewHTML;
+
+            // Load custom Google Font if needed
+            if (customGoogleFontLink) {
+                loadGoogleFont(customGoogleFontLink);
+            }
+        }
+
+        function loadGoogleFont(link) {
+            // Check if font is already loaded
+            const existingLink = document.querySelector(`link[href="${link}"]`);
+            if (!existingLink) {
+                const linkElement = document.createElement('link');
+                linkElement.href = link;
+                linkElement.rel = 'stylesheet';
+                document.head.appendChild(linkElement);
+            }
         }
 
         function formatText(format) {
@@ -360,11 +445,17 @@
                 case 'underline':
                     formattedText = `<u>${selectedText}</u>`;
                     break;
+                case 'strikethrough':
+                    formattedText = `<s>${selectedText}</s>`;
+                    break;
                 case 'h1':
                     formattedText = `<h1>${selectedText}</h1>`;
                     break;
                 case 'h2':
                     formattedText = `<h2>${selectedText}</h2>`;
+                    break;
+                case 'h3':
+                    formattedText = `<h3>${selectedText}</h3>`;
                     break;
                 case 'link':
                     const url = prompt('Enter URL:', 'https://');
@@ -376,6 +467,12 @@
                     break;
                 case 'code':
                     formattedText = `<code>${selectedText}</code>`;
+                    break;
+                case 'highlight':
+                    formattedText = `<mark>${selectedText}</mark>`;
+                    break;
+                case 'quote':
+                    formattedText = `<blockquote>${selectedText}</blockquote>`;
                     break;
                 default:
                     formattedText = selectedText;
@@ -392,6 +489,49 @@
 
             // Update preview
             updatePreview();
+        }
+
+        function handleFontChange() {
+            const fontSelect = document.getElementById('fontSelect');
+            const fontInput = document.getElementById('fontInput');
+            const googleFontsLink = document.getElementById('googleFontsLink');
+
+            if (fontSelect.value === 'other') {
+                fontInput.classList.remove('hidden');
+                googleFontsLink.classList.remove('hidden');
+                fontInput.focus();
+            } else {
+                fontInput.classList.add('hidden');
+                googleFontsLink.classList.add('hidden');
+                selectedFont = fontSelect.value;
+                customGoogleFontLink = '';
+                updatePreview();
+            }
+        }
+
+        function applyCustomFont() {
+            const fontInput = document.getElementById('fontInput');
+            const link = fontInput.value.trim();
+
+            if (!link) {
+                document.getElementById('fontSelect').value = '';
+                selectedFont = '';
+                customGoogleFontLink = '';
+                return;
+            }
+
+            // Extract font family from Google Fonts link
+            // Example: https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap
+            const match = link.match(/family=([^:&]+)/);
+            if (match) {
+                const fontName = decodeURIComponent(match[1].replace(/\+/g, ' '));
+                selectedFont = `'${fontName}', sans-serif`;
+                customGoogleFontLink = link;
+                updatePreview();
+            } else {
+                alert('Invalid Google Fonts link. Please paste a valid link from fonts.google.com');
+                fontInput.value = '';
+            }
         }
 
         function toggleHTMLExport() {
@@ -429,6 +569,15 @@
 
             generatedHTML += '</div>';
 
+            // Include Google Fonts link if custom font is used
+            let fontLink = '';
+            if (customGoogleFontLink) {
+                fontLink = `<link href="${customGoogleFontLink}" rel="stylesheet">\n\n`;
+            }
+
+            // Determine the font family to use in CSS
+            const fontFamily = selectedFont || 'Arial, sans-serif';
+
             // Add CSS styling suggestion
             const cssStyles = `
 <style>
@@ -436,7 +585,7 @@
     max-width: 800px;
     margin: 20px auto;
     padding: 20px;
-    font-family: Arial, sans-serif;
+    font-family: ${fontFamily};
   }
 
   .post img {
@@ -453,11 +602,32 @@
     color: #333;
     white-space: pre-wrap;
   }
+
+  .post-text mark {
+    background-color: #fff59d;
+    padding: 2px 4px;
+  }
+
+  .post-text blockquote {
+    border-left: 4px solid #667eea;
+    padding-left: 16px;
+    margin: 16px 0;
+    color: #555;
+    font-style: italic;
+  }
+
+  .post-text code {
+    background-color: #f5f5f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+  }
 </style>
 
 `;
 
-            const fullHTML = cssStyles + generatedHTML;
+            const fullHTML = fontLink + cssStyles + generatedHTML;
 
             htmlOutput.textContent = fullHTML;
             htmlOutputSection.classList.remove('hidden');
