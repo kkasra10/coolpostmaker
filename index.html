@@ -257,6 +257,128 @@
         #generateBtn.active {
             background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
         }
+
+        .voice-recorder {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .record-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .record-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            padding: 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .record-btn.idle {
+            background: linear-gradient(135deg, #e53935, #d32f2f);
+        }
+
+        .record-btn.recording {
+            background: linear-gradient(135deg, #e53935, #d32f2f);
+            animation: pulse-record 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-record {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.5); }
+            50% { box-shadow: 0 0 0 12px rgba(229, 57, 53, 0); }
+        }
+
+        .record-status {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .record-status.active {
+            color: #e53935;
+            font-weight: 600;
+        }
+
+        .record-timer {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            color: #333;
+            min-width: 50px;
+        }
+
+        .waveform-container {
+            height: 60px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .waveform-container canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .recordings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .recording-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .recording-item audio {
+            flex: 1;
+            height: 36px;
+        }
+
+        .delete-recording-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #ff5252;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .delete-recording-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(255, 82, 82, 0.4);
+        }
+
+        .preview-post audio {
+            width: 100%;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -275,6 +397,28 @@
             <div class="form-group hidden" id="imageUploadGroup">
                 <label for="imageUpload">Upload Image:</label>
                 <input type="file" id="imageUpload" accept="image/*">
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="wantVoice">
+                    <span>Do you want to add a voice recording?</span>
+                </label>
+            </div>
+
+            <div class="form-group hidden" id="voiceRecordGroup">
+                <label>Voice Recording:</label>
+                <div class="voice-recorder">
+                    <div class="waveform-container" id="waveformContainer">
+                        <canvas id="waveformCanvas"></canvas>
+                    </div>
+                    <div class="record-controls">
+                        <button class="record-btn idle" id="recordBtn" onclick="toggleRecording()">⏺</button>
+                        <span class="record-timer" id="recordTimer">0:00</span>
+                        <span class="record-status" id="recordStatus">Click to record</span>
+                    </div>
+                    <div class="recordings-list" id="recordingsList"></div>
+                </div>
             </div>
 
             <div class="form-group">
@@ -354,6 +498,198 @@
         let customGoogleFontLink = '';
         let selectedFont = '';
 
+        // Voice recording state
+        const wantVoiceCheckbox = document.getElementById('wantVoice');
+        const voiceRecordGroup = document.getElementById('voiceRecordGroup');
+        const recordBtn = document.getElementById('recordBtn');
+        const recordTimer = document.getElementById('recordTimer');
+        const recordStatus = document.getElementById('recordStatus');
+        const recordingsList = document.getElementById('recordingsList');
+        const waveformCanvas = document.getElementById('waveformCanvas');
+        const waveformCtx = waveformCanvas.getContext('2d');
+
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordings = []; // Array of { blob, dataUrl }
+        let isRecording = false;
+        let recordingStartTime = null;
+        let timerInterval = null;
+        let audioContext = null;
+        let analyser = null;
+        let animationFrameId = null;
+        let audioStream = null;
+
+        // Toggle voice recording visibility
+        wantVoiceCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                voiceRecordGroup.classList.remove('hidden');
+                resizeWaveformCanvas();
+            } else {
+                voiceRecordGroup.classList.add('hidden');
+                if (isRecording) stopRecording();
+                recordings = [];
+                recordingsList.innerHTML = '';
+                updatePreview();
+            }
+        });
+
+        function resizeWaveformCanvas() {
+            const container = document.getElementById('waveformContainer');
+            waveformCanvas.width = container.clientWidth;
+            waveformCanvas.height = container.clientHeight;
+            drawIdleWaveform();
+        }
+
+        function drawIdleWaveform() {
+            waveformCtx.fillStyle = '#f8f9ff';
+            waveformCtx.fillRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+            waveformCtx.strokeStyle = '#ccc';
+            waveformCtx.lineWidth = 1;
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, waveformCanvas.height / 2);
+            waveformCtx.lineTo(waveformCanvas.width, waveformCanvas.height / 2);
+            waveformCtx.stroke();
+        }
+
+        function drawWaveform() {
+            if (!analyser) return;
+            const bufferLength = analyser.fftSize;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteTimeDomainData(dataArray);
+
+            waveformCtx.fillStyle = '#f8f9ff';
+            waveformCtx.fillRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+
+            waveformCtx.lineWidth = 2;
+            waveformCtx.strokeStyle = '#e53935';
+            waveformCtx.beginPath();
+
+            const sliceWidth = waveformCanvas.width / bufferLength;
+            let x = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const v = dataArray[i] / 128.0;
+                const y = (v * waveformCanvas.height) / 2;
+                if (i === 0) waveformCtx.moveTo(x, y);
+                else waveformCtx.lineTo(x, y);
+                x += sliceWidth;
+            }
+            waveformCtx.lineTo(waveformCanvas.width, waveformCanvas.height / 2);
+            waveformCtx.stroke();
+
+            animationFrameId = requestAnimationFrame(drawWaveform);
+        }
+
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            recordTimer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        async function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                await startRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(audioStream);
+                audioChunks = [];
+
+                // Set up audio visualization
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(audioStream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                mediaRecorder.ondataavailable = function(e) {
+                    audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = function() {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        recordings.push({ blob: audioBlob, dataUrl: e.target.result });
+                        renderRecordingsList();
+                        updatePreview();
+                    };
+                    reader.readAsDataURL(audioBlob);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordingStartTime = Date.now();
+                timerInterval = setInterval(updateTimer, 1000);
+
+                recordBtn.classList.remove('idle');
+                recordBtn.classList.add('recording');
+                recordBtn.textContent = '⏹';
+                recordStatus.textContent = 'Recording...';
+                recordStatus.classList.add('active');
+
+                resizeWaveformCanvas();
+                drawWaveform();
+            } catch (err) {
+                alert('Could not access microphone. Please allow microphone access and try again.');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+                audioStream = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+                analyser = null;
+            }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            clearInterval(timerInterval);
+
+            isRecording = false;
+            recordBtn.classList.remove('recording');
+            recordBtn.classList.add('idle');
+            recordBtn.textContent = '⏺';
+            recordTimer.textContent = '0:00';
+            recordStatus.textContent = 'Click to record';
+            recordStatus.classList.remove('active');
+
+            drawIdleWaveform();
+        }
+
+        function deleteRecording(index) {
+            recordings.splice(index, 1);
+            renderRecordingsList();
+            updatePreview();
+        }
+
+        function renderRecordingsList() {
+            recordingsList.innerHTML = '';
+            recordings.forEach(function(rec, i) {
+                const item = document.createElement('div');
+                item.className = 'recording-item';
+                item.innerHTML = `
+                    <span style="font-size:18px;">🎙️</span>
+                    <audio controls src="${rec.dataUrl}"></audio>
+                    <button class="delete-recording-btn" onclick="deleteRecording(${i})" title="Remove">✕</button>
+                `;
+                recordingsList.appendChild(item);
+            });
+        }
+
         // Toggle image upload visibility
         wantImageCheckbox.addEventListener('change', function() {
             if (this.checked) {
@@ -385,8 +721,9 @@
         function updatePreview() {
             const text = postText.value;
             const hasImage = wantImageCheckbox.checked && uploadedImageData;
+            const hasRecordings = wantVoiceCheckbox.checked && recordings.length > 0;
 
-            if (!text && !hasImage) {
+            if (!text && !hasImage && !hasRecordings) {
                 preview.innerHTML = '<div class="empty-state">Your post preview will appear here...</div>';
                 return;
             }
@@ -401,6 +738,12 @@
                 // Render HTML tags in preview with selected font
                 const fontStyle = selectedFont ? `style="font-family: ${selectedFont};"` : '';
                 previewHTML += `<div class="text-content" ${fontStyle}>${text}</div>`;
+            }
+
+            if (hasRecordings) {
+                recordings.forEach(function(rec, i) {
+                    previewHTML += `<audio controls src="${rec.dataUrl}" style="width:100%;margin-top:10px;"></audio>`;
+                });
             }
 
             preview.innerHTML = previewHTML;
@@ -550,8 +893,9 @@
         function generateHTML() {
             const text = postText.value;
             const hasImage = wantImageCheckbox.checked && uploadedImageData;
+            const hasRecordings = wantVoiceCheckbox.checked && recordings.length > 0;
 
-            if (!text && !hasImage) {
+            if (!text && !hasImage && !hasRecordings) {
                 alert('Please add some content to your post!');
                 return;
             }
@@ -565,6 +909,14 @@
             if (text) {
                 // Don't escape HTML since user may have added formatting
                 generatedHTML += `  <div class="post-text">\n    ${text}\n  </div>\n`;
+            }
+
+            if (hasRecordings) {
+                generatedHTML += '  <div class="post-audio">\n';
+                recordings.forEach(function(rec, i) {
+                    generatedHTML += `    <audio controls src="${rec.dataUrl}" style="width: 100%; margin-top: 10px;"></audio>\n`;
+                });
+                generatedHTML += '  </div>\n';
             }
 
             generatedHTML += '</div>';
